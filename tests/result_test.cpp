@@ -44,12 +44,7 @@ class NoncopyableObject {
   }
 };
 
-/**
- * @brief make_ok関数のテスト
- *
- * - 基本的な型（int）での成功値の生成と取得をテスト
- * - ムーブ専用型（NoncopyableObject）での成功値の生成と取得をテスト
- */
+// 基本的な型とムーブ専用型での成功値の生成と取得をテスト
 TEST(ResultTest, MakeOk) {
   {
     Result<int, int> result = make_ok(42);
@@ -65,12 +60,7 @@ TEST(ResultTest, MakeOk) {
   }
 }
 
-/**
- * @brief make_err関数のテスト
- *
- * - 基本的な型（int）での失敗値の生成と取得をテスト
- * - ムーブ専用型（NoncopyableObject）での失敗値の生成と取得をテスト
- */
+// 基本的な型とムーブ専用型での失敗値の生成と取得をテスト
 TEST(ResultTest, MakeErr) {
   {
     Result<int, int> result = make_err(42);
@@ -87,13 +77,7 @@ TEST(ResultTest, MakeErr) {
   }
 }
 
-/**
- * @brief unwrap_or関数のテスト
- *
- * - 成功値を保持している場合、その値が返されることをテスト
- * - 失敗値を保持している場合、デフォルト値が返されることをテスト
- * - ムーブ専用型での動作をテスト
- */
+// 成功値と失敗値の場合のunwrap_orの動作をテスト
 TEST(ResultTest, UnwrapOr) {
   {
     Result<int, int> result = make_ok(42);
@@ -113,12 +97,7 @@ TEST(ResultTest, UnwrapOr) {
   }
 }
 
-/**
- * @brief map関数のテスト
- *
- * - 成功値に対して変換関数が適用されることをテスト
- * - 失敗値に対して変換関数が適用されないことをテスト
- */
+// 成功値と失敗値に対するmap関数の動作をテスト
 TEST(ResultTest, Map) {
   {
     Result<int, int> result = make_ok(42);
@@ -134,12 +113,7 @@ TEST(ResultTest, Map) {
   }
 }
 
-/**
- * @brief map_err関数のテスト
- *
- * - 成功値に対して変換関数が適用されないことをテスト
- * - 失敗値に対して変換関数が適用されることをテスト
- */
+// 成功値と失敗値に対するmap_err関数の動作をテスト
 TEST(ResultTest, MapErr) {
   {
     Result<int, int> result = make_ok(42);
@@ -155,55 +129,55 @@ TEST(ResultTest, MapErr) {
   }
 }
 
-/**
- * @brief inspect_ok関数のテスト
- *
- * - 成功値に対して副作用関数が実行されることをテスト
- * - 失敗値に対して副作用関数が実行されないことをテスト
- */
+// 成功値と失敗値に対するinspect_ok関数の動作をテスト
 TEST(ResultTest, InspectOk) {
   {
     int called = 0;
     Result<int, int> result = make_ok(42);
-    result.inspect_ok([&called](int x) { called = x; });
+    auto& ref = result.inspect_ok([&called](int x) { called = x; });
     EXPECT_EQ(called, 42);
+    EXPECT_EQ(&ref, &result) << "inspect_ok should return reference to self";
+
+    // メソッドチェーンのテスト
+    called = 0;
+    result.inspect_ok([&called](int x) { called = x; })
+        .inspect_ok([&called](int x) { called += x; });
+    EXPECT_EQ(called, 84) << "Method chaining should work";
   }
   {
     int called = 0;
     Result<int, int> result = make_err(42);
-    result.inspect_ok([&called](int x) { called = x; });
+    auto& ref = result.inspect_ok([&called](int x) { called = x; });
     EXPECT_EQ(called, 0);
+    EXPECT_EQ(&ref, &result) << "inspect_ok should return reference to self";
   }
 }
 
-/**
- * @brief inspect_err関数のテスト
- *
- * - 成功値に対して副作用関数が実行されないことをテスト
- * - 失敗値に対して副作用関数が実行されることをテスト
- */
+// 成功値と失敗値に対するinspect_err関数の動作をテスト
 TEST(ResultTest, InspectErr) {
   {
     int called = 0;
     Result<int, int> result = make_ok(42);
-    result.inspect_err([&called](int x) { called = x; });
+    auto& ref = result.inspect_err([&called](int x) { called = x; });
     EXPECT_EQ(called, 0);
+    EXPECT_EQ(&ref, &result) << "inspect_err should return reference to self";
   }
   {
     int called = 0;
     Result<int, int> result = make_err(42);
-    result.inspect_err([&called](int x) { called = x; });
+    auto& ref = result.inspect_err([&called](int x) { called = x; });
     EXPECT_EQ(called, 42);
+    EXPECT_EQ(&ref, &result) << "inspect_err should return reference to self";
+
+    // メソッドチェーンのテスト
+    called = 0;
+    result.inspect_err([&called](int x) { called = x; })
+        .inspect_err([&called](int x) { called += x; });
+    EXPECT_EQ(called, 84) << "Method chaining should work";
   }
 }
 
-/**
- * @brief and_then関数のテスト
- *
- * - 成功値に対して成功を返す関数を適用した場合の動作をテスト
- * - 成功値に対して失敗を返す関数を適用した場合の動作をテスト
- * - 失敗値に対して関数が適用されないことをテスト
- */
+// 成功値と失敗値に対するand_then関数の動作をテスト
 TEST(ResultTest, AndThen) {
   auto ok_fn = [](int x) -> Result<int, int> { return make_ok(x * 2); };
   auto err_fn = [](int x) -> Result<int, int> { return make_err(x * 2); };

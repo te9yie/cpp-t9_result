@@ -233,12 +233,11 @@ class Result final {
    * 成功値を保持している場合のみ関数fを適用します。
    */
   template <typename F>
-  Result inspect_ok(F&& f) {
-    Result self = std::move(*this);
-    if (self.is_ok()) {
-      f(std::get<Ok<T>>(self.m_value).m_value);
+  Result& inspect_ok(F&& f) {
+    if (is_ok()) {
+      f(std::get<Ok<T>>(m_value).m_value);
     }
-    return self;
+    return *this;
   }
 
   /**
@@ -250,12 +249,11 @@ class Result final {
    * 失敗値を保持している場合のみ関数fを適用します。
    */
   template <typename F>
-  Result inspect_err(F&& f) {
-    Result self = std::move(*this);
-    if (self.is_err()) {
-      f(std::get<Err<E>>(self.m_value).m_value);
+  Result& inspect_err(F&& f) {
+    if (is_err()) {
+      f(std::get<Err<E>>(m_value).m_value);
     }
-    return self;
+    return *this;
   }
 
   /**
