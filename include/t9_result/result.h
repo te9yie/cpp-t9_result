@@ -18,6 +18,14 @@ struct Ok {
 };
 
 /**
+ * @brief void型の成功値を表す型
+ */
+template <>
+struct Ok<void> {
+  Ok() {}
+};
+
+/**
  * @brief 成功値からOk型を生成するヘルパー関数
  * @tparam T 成功値の型
  * @param value 成功値
@@ -26,6 +34,14 @@ struct Ok {
 template <typename T>
 inline Ok<T> make_ok(T value) {
   return value;
+}
+
+/**
+ * @brief void型の成功値からOk型を生成するヘルパー関数
+ * @return Ok<void> 成功値をラップしたOk型
+ */
+inline Ok<void> make_ok() {
+  return Ok<void>();
 }
 
 /**
@@ -270,6 +286,172 @@ class Result final {
     Result self = std::move(*this);
     if (self.is_ok()) {
       return f(std::get<Ok<T>>(self.m_value).m_value);
+    }
+    return Err<E>(std::get<Err<E>>(self.m_value).m_value);
+  }
+};
+
+/**
+ * @brief Result型の void 特殊化
+ * @tparam E 失敗値の型
+ *
+ * 成功値を持たない（void型の）Result型です。
+ * 処理の成功/失敗のみを表現する場合に使用します。
+ */
+template <typename E>
+class Result<void, E> final {
+ private:
+  std::variant<std::monostate, Ok<void>, Err<E>> m_value;
+
+ public:
+  /**
+   * @brief 成功値からResultを生成するコンストラクタ
+   * @param ok 成功を表すOk<void>型
+   */
+  Result(Ok<void> ok) : m_value(std::move(ok)) {}
+
+  /**
+   * @brief 失敗値からResultを生成するコンストラクタ
+   * @param err 失敗値をラップしたErr型
+   */
+  Result(Err<E> err) : m_value(std::move(err)) {}
+
+  /**
+   * @brief 成功状態を保持しているか確認
+   * @return bool 成功状態を保持している場合true
+   */
+  bool is_ok() const {
+    return std::holds_alternative<Ok<void>>(m_value);
+  }
+
+  /**
+   * @brief 失敗値を保持しているか確認
+   * @return bool 失敗値を保持している場合true
+   */
+  bool is_err() const {
+    return std::holds_alternative<Err<E>>(m_value);
+  }
+
+  /**
+   * @brief 成功状態の確認
+   * @note 失敗値を保持している場合はアサーション違反
+   */
+  void unwrap() {
+    assert(is_ok());
+  }
+
+  /**
+   * @brief 失敗値を取得（所有権を移動）
+   * @return E 失敗値
+   * @note 成功状態を保持している場合はアサーション違反
+   */
+  E unwrap_err() {
+    assert(is_err());
+    return std::move(std::get<Err<E>>(m_value).m_value);
+  }
+
+  /**
+   * @brief 失敗値への参照を取得
+   * @return E& 失敗値への参照
+   * @note 成功状態を保持している場合はアサーション違反
+   */
+  E& ref_err() {
+    assert(is_err());
+    return std::get<Err<E>>(m_value).m_value;
+  }
+
+  /**
+   * @brief 失敗値への const 参照を取得
+   * @return const E& 失敗値への const 参照
+   * @note 成功状態を保持している場合はアサーション違反
+   */
+  const E& ref_err() const {
+    assert(is_err());
+    return std::get<Err<E>>(m_value).m_value;
+  }
+
+  /**
+   * @brief 成功時に関数を適用して新しいResult型を生成
+   * @tparam F 適用する関数の型
+   * @param f 適用する関数
+   * @return Result<decltype(f()), E> 関数適用後の新しいResult型
+   *
+   * 成功状態の場合は関数fを適用し、その結果を新しいResultとして返します。
+   * 失敗値を保持している場合は、失敗値をそのまま保持した新しいResultを返します。
+   */
+  template <typename F>
+  auto map(F&& f) -> Result<decltype(f()), E> {
+    Result self = std::move(*this);
+    if (self.is_ok()) {
+      return make_ok(f());
+    }
+    return Err<E>(std::get<Err<E>>(self.m_value).m_value);
+  }
+
+  /**
+   * @brief 失敗値に関数を適用して新しいResult型を生成
+   * @tparam F 適用する関数の型
+   * @param f 適用する関数
+   * @return Result<void, decltype(f(E))> 関数適用後の新しいResult型
+   *
+   * 失敗値を保持している場合は関数fを適用し、その結果を新しいResultとして返します。
+   * 成功状態の場合は、成功状態をそのまま保持した新しいResultを返します。
+   */
+  template <typename F>
+  auto map_err(F&& f) -> Result<void, decltype(f(std::declval<E>()))> {
+    Result self = std::move(*this);
+    if (self.is_err()) {
+      return make_err(f(std::get<Err<E>>(self.m_value).m_value));
+    }
+    return Ok<void>();
+  }
+
+  /**
+   * @brief 成功時に関数を適用し、元のResultを返す
+   * @tparam F 適用する関数の型
+   * @param f 適用する関数
+   * @return Result 元のResult
+   *
+   * 成功状態の場合のみ関数fを適用します。
+   */
+  template <typename F>
+  Result& inspect_ok(F&& f) {
+    if (is_ok()) {
+      f();
+    }
+    return *this;
+  }
+
+  /**
+   * @brief 失敗値に関数を適用し、元のResultを返す
+   * @tparam F 適用する関数の型
+   * @param f 適用する関数
+   * @return Result 元のResult
+   *
+   * 失敗値を保持している場合のみ関数fを適用します。
+   */
+  template <typename F>
+  Result& inspect_err(F&& f) {
+    if (is_err()) {
+      f(std::get<Err<E>>(m_value).m_value);
+    }
+    return *this;
+  }
+
+  /**
+   * @brief 成功時に関数を適用してチェーン処理を行う
+   * @tparam F 適用する関数の型
+   * @param f Result型を返す関数
+   * @return decltype(f()) 関数fの戻り値型
+   *
+   * 成功状態の場合は関数fを適用し、その結果のResultを返します。
+   * 失敗値を保持している場合は、失敗値をそのまま保持した新しいResultを返します。
+   */
+  template <typename F>
+  auto and_then(F&& f) -> decltype(f()) {
+    Result self = std::move(*this);
+    if (self.is_ok()) {
+      return f();
     }
     return Err<E>(std::get<Err<E>>(self.m_value).m_value);
   }

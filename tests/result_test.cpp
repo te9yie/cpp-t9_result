@@ -202,4 +202,147 @@ TEST(ResultTest, AndThen) {
   }
 }
 
+// void型のResultの基本的な動作をテスト
+TEST(ResultTest, VoidResult) {
+  {
+    Result<void, int> result = make_ok();
+    EXPECT_TRUE(result.is_ok());
+    result.unwrap();  // アサーションが発生しないことを確認
+  }
+  {
+    Result<void, int> result = make_err(42);
+    EXPECT_TRUE(result.is_err());
+    EXPECT_EQ(result.unwrap_err(), 42);
+    EXPECT_EQ(result.ref_err(), 42);
+  }
+}
+
+// void型のResultに対するmap関数の動作をテスト
+TEST(ResultTest, VoidResultMap) {
+  {
+    Result<void, int> result = make_ok();
+    int called = 0;
+    auto mapped = result.map([&called]() {
+      called = 42;
+      return called;
+    });
+    EXPECT_TRUE(mapped.is_ok());
+    EXPECT_EQ(mapped.unwrap(), 42);
+    EXPECT_EQ(called, 42);
+  }
+  {
+    Result<void, int> result = make_err(42);
+    int called = 0;
+    auto mapped = result.map([&called]() {
+      called = 43;
+      return called;
+    });
+    EXPECT_TRUE(mapped.is_err());
+    EXPECT_EQ(mapped.unwrap_err(), 42);
+    EXPECT_EQ(called, 0) << "Map function should not be called on error";
+  }
+}
+
+// void型のResultに対するmap_err関数の動作をテスト
+TEST(ResultTest, VoidResultMapErr) {
+  {
+    Result<void, int> result = make_ok();
+    auto mapped = result.map_err([](int x) { return x * 2; });
+    EXPECT_TRUE(mapped.is_ok());
+  }
+  {
+    Result<void, int> result = make_err(42);
+    auto mapped = result.map_err([](int x) { return x * 2; });
+    EXPECT_TRUE(mapped.is_err());
+    EXPECT_EQ(mapped.unwrap_err(), 84);
+  }
+}
+
+// void型のResultに対するinspect_ok関数の動作をテスト
+TEST(ResultTest, VoidResultInspectOk) {
+  {
+    int called = 0;
+    Result<void, int> result = make_ok();
+    auto& ref = result.inspect_ok([&called]() { called = 42; });
+    EXPECT_EQ(called, 42);
+    EXPECT_EQ(&ref, &result) << "inspect_ok should return reference to self";
+
+    // メソッドチェーンのテスト
+    called = 0;
+    result.inspect_ok([&called]() { called = 42; }).inspect_ok([&called]() {
+      called += 42;
+    });
+    EXPECT_EQ(called, 84) << "Method chaining should work";
+  }
+  {
+    int called = 0;
+    Result<void, int> result = make_err(42);
+    auto& ref = result.inspect_ok([&called]() { called = 42; });
+    EXPECT_EQ(called, 0);
+    EXPECT_EQ(&ref, &result) << "inspect_ok should return reference to self";
+  }
+}
+
+// void型のResultに対するinspect_err関数の動作をテスト
+TEST(ResultTest, VoidResultInspectErr) {
+  {
+    int called = 0;
+    Result<void, int> result = make_ok();
+    auto& ref = result.inspect_err([&called](int x) { called = x; });
+    EXPECT_EQ(called, 0);
+    EXPECT_EQ(&ref, &result) << "inspect_err should return reference to self";
+  }
+  {
+    int called = 0;
+    Result<void, int> result = make_err(42);
+    auto& ref = result.inspect_err([&called](int x) { called = x; });
+    EXPECT_EQ(called, 42);
+    EXPECT_EQ(&ref, &result) << "inspect_err should return reference to self";
+
+    // メソッドチェーンのテスト
+    called = 0;
+    result.inspect_err([&called](int x) { called = x; })
+        .inspect_err([&called](int x) { called += x; });
+    EXPECT_EQ(called, 84) << "Method chaining should work";
+  }
+}
+
+// void型のResultに対するand_then関数の動作をテスト
+TEST(ResultTest, VoidResultAndThen) {
+  auto ok_fn = []() -> Result<int, int> { return make_ok(42); };
+  auto err_fn = []() -> Result<int, int> { return make_err(42); };
+  auto void_ok_fn = []() -> Result<void, int> { return make_ok(); };
+  auto void_err_fn = []() -> Result<void, int> { return make_err(42); };
+
+  {
+    Result<void, int> result = make_ok();
+    auto chained = result.and_then(ok_fn);
+    EXPECT_TRUE(chained.is_ok());
+    EXPECT_EQ(chained.unwrap(), 42);
+  }
+  {
+    Result<void, int> result = make_ok();
+    auto chained = result.and_then(err_fn);
+    EXPECT_TRUE(chained.is_err());
+    EXPECT_EQ(chained.unwrap_err(), 42);
+  }
+  {
+    Result<void, int> result = make_err(42);
+    auto chained = result.and_then(ok_fn);
+    EXPECT_TRUE(chained.is_err());
+    EXPECT_EQ(chained.unwrap_err(), 42);
+  }
+  {
+    Result<void, int> result = make_ok();
+    auto chained = result.and_then(void_ok_fn);
+    EXPECT_TRUE(chained.is_ok());
+  }
+  {
+    Result<void, int> result = make_ok();
+    auto chained = result.and_then(void_err_fn);
+    EXPECT_TRUE(chained.is_err());
+    EXPECT_EQ(chained.unwrap_err(), 42);
+  }
+}
+
 }  // namespace
